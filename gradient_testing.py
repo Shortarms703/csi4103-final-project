@@ -21,48 +21,68 @@ def relu(x):
 # Feedforward Neural Network class
 class SimpleNN:
     def __init__(self, input_size, output_size):
-        # Initialize weights
+        """
+        Initialize weights
+        :param input_size:
+        :param output_size:
+        """
         self.W1 = np.random.randn(input_size, output_size)
         self.b1 = np.zeros((1, output_size))
 
+        self.z1 = None
+        self.a1 = None
+
     def forward(self, X):
-        # Forward pass
+        """
+        Forward pass
+        :param X:
+        :return:
+        """
         self.z1 = np.dot(X, self.W1) + self.b1
         self.a1 = sigmoid(self.z1)
         return self.a1
 
-    def loss(self, y, y_pred):
+    @staticmethod
+    def loss(y, y_pred):
+        """
+        Calculates loss function value for given true and predicted values
+        :param y:
+        :param y_pred:
+        :return:
+        """
         # Mean Squared Error loss
         return np.mean((y - y_pred) ** 2)
         # Binary cross-entropy loss
         # return -np.mean(y * np.log(y_pred) + (1 - y) * np.log(1 - y_pred))
 
-    def forward_propagation_gradients(self, X, y):
-        # Compute gradients using forward propagation (less efficient)
-        pass  # Placeholder for manual gradient calculation
-
     def backpropagation_gradients(self, X, y):
-        # Backpropagation (efficient)
+        """
+        Calculates gradients using backpropagation (typical approach)
+        :param X:
+        :param y:
+        :return:
+        """
         m = X.shape[0]
 
-        # Forward pass
         y_pred = self.forward(X)
 
-        # Backward pass
         dz1 = y_pred - y  # dL/dz1
 
-        # Calculate gradients with respect to weights and biases
         dW1 = np.dot(X.T, dz1) / m  # dL/dW1
         db1 = np.sum(dz1, axis=0, keepdims=True) / m  # dL/db1
 
         return dW1, db1
 
     def backpropagation_with_actual_gradients(self, X, y):
+        """
+        Backpropagation with gradients calculated with sympy
+        :param X:
+        :param y:
+        :return:
+        """
         start1 = time.time()
-        # Define symbols for individual components
         s_W1_1, s_W1_2, s_b1, s_X1, s_X2, s_y = symbols('W1_1 W1_2 b1 X1 X2 y')
 
-        # Symbolic expressions for forward pass
         s_z1 = s_X1 * s_W1_1 + s_X2 * s_W1_2 + s_b1
         s_a1 = 1 / (1 + sympy.exp(-s_z1))  # sigmoid activation
         # s_a1 = s_z1  # linear activation
@@ -77,16 +97,13 @@ class SimpleNN:
         # print(f"Symbolic differentiation took {end1 - start1:.2f} seconds")
 
         start2 = time.time()
-        # Initialize gradients
         dW1 = np.zeros_like(self.W1)
         db1 = np.zeros_like(self.b1)
 
-        # For each sample, calculate the gradients and accumulate
         for i in range(X.shape[0]):
             X1_val, X2_val = X[i]
             y_val = y[i, 0]
 
-            # Substitute actual values into the symbolic derivatives
             grad_W1_1 = s_dloss_dW1_1.subs(
                 {s_W1_1: self.W1[0, 0], s_W1_2: self.W1[1, 0], s_b1: self.b1[0, 0], s_X1: X1_val, s_X2: X2_val,
                  s_y: y_val})
@@ -97,12 +114,10 @@ class SimpleNN:
                 {s_W1_1: self.W1[0, 0], s_W1_2: self.W1[1, 0], s_b1: self.b1[0, 0], s_X1: X1_val, s_X2: X2_val,
                  s_y: y_val})
 
-            # Accumulate gradients
             dW1[0, 0] += grad_W1_1
             dW1[1, 0] += grad_W1_2
             db1[0, 0] += grad_b1
 
-        # Average the gradients over all samples
         dW1 /= X.shape[0]
         db1 /= X.shape[0]
         end2 = time.time()
@@ -111,6 +126,12 @@ class SimpleNN:
         return dW1, db1
 
     def backpropagation_with_forward_AD(self, X, y):
+        """
+        Backpropagation with gradients calculated with forward accumulation
+        :param X:
+        :param y:
+        :return:
+        """
         s_X1 = Variable('X1')
         s_X2 = Variable('X2')
         s_W1_1 = Variable('W1_1')
@@ -150,6 +171,12 @@ class SimpleNN:
         return dW1, db1
 
     def backpropagation_with_reverse_AD(self, X, y):
+        """
+        Backpropagation with gradients calculated with reverse accumulation
+        :param X:
+        :param y:
+        :return:
+        """
         s_X1 = Variable('X1')
         s_X2 = Variable('X2')
         s_W1_1 = Variable('W1_1')
@@ -191,7 +218,12 @@ class SimpleNN:
 
 
     def update_weights(self, gradients, lr=0.01):
-        # Update weights using gradients
+        """
+        Update weights using gradients
+        :param gradients:
+        :param lr:
+        :return:
+        """
         dW1, db1 = gradients
         self.W1 -= lr * dW1
         self.b1 -= lr * db1
@@ -227,7 +259,7 @@ while accuracy < 0.99 and epoch < max_epochs:
         print(f"Epoch {epoch}")
         accuracy = test_accuracy(y_test, y_pred_test)
         print(f"Test accuracy: {accuracy:.2f}")
-        loss = nn.loss(y_test, y_pred_test)
+        loss = SimpleNN.loss(y_test, y_pred_test)
         print(f"Test loss: {loss:.2f}")
 
         plot_decision_boundary(X_test, y_test, nn)
