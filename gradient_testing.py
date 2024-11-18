@@ -5,7 +5,8 @@ import sympy
 from sklearn.model_selection import train_test_split
 from sympy import symbols, diff
 
-from circuits import Variable, Constant, Add, Multiply, Expression, Exponent, forward_propagation_partial, Sigmoid
+from circuits import Variable, Constant, Add, Multiply, Expression, Exponent, forward_propagation_partial, Sigmoid, \
+    back_propagation_partial
 from utils import test_accuracy, plot_decision_boundary
 
 
@@ -148,6 +149,47 @@ class SimpleNN:
 
         return dW1, db1
 
+    def backpropagation_with_reverse_AD(self, X, y):
+        s_X1 = Variable('X1')
+        s_X2 = Variable('X2')
+        s_W1_1 = Variable('W1_1')
+        s_W1_2 = Variable('W1_2')
+        s_b1 = Variable('b1')
+        s_y = Variable('y')
+
+        s_z1 = Add(Add(Multiply(s_X1, s_W1_1), Multiply(s_X2, s_W1_2)), s_b1)
+        s_sigmoid_loss = Expression(Exponent(Add(Sigmoid(s_z1), Multiply(Constant(-1), s_y)), Constant(2)))
+        partials = back_propagation_partial(s_sigmoid_loss)
+        partial_W1_1 = partials.get_derivative(s_W1_1)
+        partial_W1_2 = partials.get_derivative(s_W1_2)
+        partial_b1 = partials.get_derivative(s_b1)
+
+        dW1 = np.zeros_like(self.W1)
+        db1 = np.zeros_like(self.b1)
+
+        for i in range(X.shape[0]):
+            X1_val, X2_val = X[i]
+            y_val = y[i, 0]
+            partial_W1_1_val = partial_W1_1.evaluate(
+                {'X1': X1_val, 'X2': X2_val, 'W1_1': self.W1[0, 0], 'W1_2': self.W1[1, 0], 'b1': self.b1[0, 0],
+                 'y': y_val})
+            partial_W1_2_val = partial_W1_2.evaluate(
+                {'X1': X1_val, 'X2': X2_val, 'W1_1': self.W1[0, 0], 'W1_2': self.W1[1, 0], 'b1': self.b1[0, 0],
+                 'y': y_val})
+            partial_b1_val = partial_b1.evaluate(
+                {'X1': X1_val, 'X2': X2_val, 'W1_1': self.W1[0, 0], 'W1_2': self.W1[1, 0], 'b1': self.b1[0, 0],
+                 'y': y_val})
+
+            dW1[0, 0] += partial_W1_1_val
+            dW1[1, 0] += partial_W1_2_val
+            db1[0, 0] += partial_b1_val
+
+        dW1 /= X.shape[0]
+        db1 /= X.shape[0]
+
+        return dW1, db1
+
+
     def update_weights(self, gradients, lr=0.01):
         # Update weights using gradients
         dW1, db1 = gradients
@@ -172,6 +214,9 @@ y_test = y_test.reshape(-1, 1)
 nn = SimpleNN(2, 1)
 nn.backpropagation_gradients(X, y)
 
+gradients3_total = 0
+gradients4_total = 0
+
 start_time = time.time()
 accuracy = 0
 epoch = 0
@@ -195,10 +240,19 @@ while accuracy < 0.99 and epoch < max_epochs:
     # gradients2 = nn.backpropagation_with_actual_gradients(X_train, y_train)
     # print("gradients2", gradients2[0][0], gradients2[0][1], gradients2[1])
 
+    start = time.time()
     gradients3 = nn.backpropagation_with_forward_AD(X_train, y_train)
+    end = time.time() - start
+    gradients3_total += end
     # print("gradients3", gradients3[0][0], gradients3[0][1], gradients3[1])
 
-    nn.update_weights(gradients3, lr=0.01)
+    start = time.time()
+    gradients4 = nn.backpropagation_with_reverse_AD(X_train, y_train)
+    end = time.time() - start
+    gradients4_total += end
+    # print("gradients4", gradients4[0][0], gradients4[0][1], gradients4[1])
+
+    nn.update_weights(gradients4, lr=0.01)
     epoch += 1
 
 
@@ -209,6 +263,9 @@ if epoch == max_epochs:
 
 backprop_time = time.time() - start_time
 print(f"Training with backpropagation took {backprop_time:.2f} seconds")
+
+print(f"Forward AD took {gradients3_total:.5f} seconds")
+print(f"Reverse AD took {gradients4_total:.5f} seconds")
 
 # Plot decision boundary
 plot_decision_boundary(X_test, y_test, nn)

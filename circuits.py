@@ -23,7 +23,9 @@ class Constant:
         self.value = value
 
     def __eq__(self, other):
-        return self.value == other.value
+        if isinstance(other, Constant):
+            return self.value == other.value
+        return False
 
     def __repr__(self):
         return str(self.value)
@@ -173,55 +175,60 @@ def forward_propagation_partial(func: Expression | Variable, var: Variable) -> E
         raise ValueError("Unsupported operation")
 
 
-def back_propagation_partial(func: Expression | Variable, var: Variable) -> Expression:
-    def derivation_helper(f: Expression | Variable, var: Variable, seed: Constant | Operation | Expression) -> Expression:
-        # pseudocode
-        # void derive(Expression Z, float seed) {
-        #    if isVariable(Z)
-        #       partialDerivativeOf(Z) += seed;
-        #    else if (Z = A + B)
-        #       derive(A, seed);
-        #       derive(B, seed);
-        #    else if (Z = A - B)
-        #       derive(A, seed);
-        #       derive(B, -seed);
-        #    else if (Z = A * B)
-        #       derive(A, valueOf(B) * seed);
-        #       derive(B, valueOf(A) * seed);
-        # }
-        if isinstance(f, Variable):
-            if f.name == var.name:
-                return Expression(seed)
-            else:
-                return Expression(Constant(0))
-        elif isinstance(f.value, Variable):
-            if f.value.name == var.name:
-                return Expression(seed)
-            else:
-                return Expression(Constant(0))
-        elif isinstance(f.value, Constant):
-            return Expression(Constant(0))
-        elif isinstance(f.value, Add):
-            # Sum rule, d(f + g)/dx = df/dx + dg/dx
-            f = Expression(f.value.left)
-            g = Expression(f.value.right)
-            return Expression(Add(derivation_helper(f, var, seed).value, derivation_helper(g, var, seed).value))
-        elif isinstance(f.value, Multiply):
-            # Product rule, d(f * g)/dx = f * dg/dx + g * df/dx
-            f = Expression(f.value.left)
-            g = Expression(f.value.right)
-            f_dg = Multiply(f.value, derivation_helper(g, var, f))
-            g_df = Multiply(g.value, derivation_helper(f, var, g))
-            return Expression(Add(f_dg, g_df))
-        elif isinstance(f.value, Exponent):
-            # Power rule with constant exponent, d(f^c)/dx = c * f^(c-1) * df/dx
-            f = Expression(f.value.base)
-            c = f.value.exponent
-            f_c_minus_1 = Exponent(f.value, Constant(c.value - 1))
-            return Expression(Multiply(Multiply(c, f_c_minus_1), derivation_helper(f, var, f)))
-        elif isinstance(f.value, Sigmoid):
-            # Chain rule, d(sigmoid(f))/dx = sigmoid(f) * (1 - sigmoid(f)) * df/dx
-            f = Expression(f.value.x)
-            sigmoid_f = Sigmoid(f.value)
-            one_minus_sigmoid_f = Add(Constant(1), Multiply(Constant(-1), sigmoid_f))
-            return Expression(Multiply(Multiply(sigmoid_f, one_minus_sigmoid_f), derivation_helper(f, var, f)))
+class ReverseModeSymbolicEvaluator:
+    def __init__(self):
+        self.derivatives = {}
+
+    def clear(self):
+        self.derivatives = {}
+
+    def get_derivative(self, var: Variable):
+        return self.derivatives.get(var.name, Expression(Constant(0)))
+
+    def add_derivative(self, var: Variable, value: Expression):
+        if var.name in self.derivatives:
+            self.derivatives[var.name] = Expression(
+                Add(self.derivatives[var.name].value, value.value)
+            )
+        else:
+            self.derivatives[var.name] = value
+
+    def derive(self, expr: Expression, seed: Expression):
+        self.clear()
+        self._derive(expr.value, seed)
+
+    def _derive(self, z, seed: Expression):
+        if isinstance(z, Constant):
+            pass
+        elif isinstance(z, Variable):
+            self.add_derivative(z, seed)
+        elif isinstance(z, Add):
+            # Sum rule: d(f + g)/dx = df/dx + dg/dx
+            self._derive(z.left, seed)
+            self._derive(z.right, seed)
+        elif isinstance(z, Multiply):
+            # Product rule: d(f * g)/dx = f * dg/dx + g * df/dx
+            self._derive(z.left, Expression(Multiply(seed.value, z.right)))
+            self._derive(z.right, Expression(Multiply(seed.value, z.left)))
+        elif isinstance(z, Exponent):
+            # Power rule with constant exponent: d(f^c)/dx = c * f^(c-1) * df/dx
+            if not isinstance(z.exponent, Constant):
+                raise ValueError("Exponent must be a constant for symbolic reverse mode")
+            c = z.exponent
+            f = Expression(z.base)
+            f_c_minus_1 = Expression(Exponent(z.base, Constant(c.value - 1)))
+            self._derive(z.base, Expression(Multiply(seed.value, Multiply(c, f_c_minus_1.value))))
+        elif isinstance(z, Sigmoid):
+            # Chain rule: d(sigmoid(f))/dx = sigmoid(f) * (1 - sigmoid(f)) * df/dx
+            sigmoid_expr = Expression(Sigmoid(z.x))
+            one_minus_sigmoid = Expression(Add(Constant(1), Multiply(Constant(-1), sigmoid_expr.value)))
+            self._derive(z.x, Expression(Multiply(Multiply(seed.value, sigmoid_expr.value), one_minus_sigmoid.value)))
+        else:
+            raise ValueError(f"Unsupported operation: {z}")
+
+
+def back_propagation_partial(func: Expression | Variable) -> ReverseModeSymbolicEvaluator:
+    evaluator = ReverseModeSymbolicEvaluator()
+    evaluator.derive(func, Expression(Constant(1)))
+
+    return evaluator
