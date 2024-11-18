@@ -18,7 +18,6 @@ def relu(x):
     return np.maximum(0, x)
 
 
-# Feedforward Neural Network class
 class SimpleNN:
     def __init__(self, input_size, output_size):
         """
@@ -121,7 +120,7 @@ class SimpleNN:
         dW1 /= X.shape[0]
         db1 /= X.shape[0]
         end2 = time.time()
-#         print(f"Actual differentiation took {end2 - start2:.2f} seconds")
+        # print(f"Actual differentiation took {end2 - start2:.2f} seconds")
 
         return dW1, db1
 
@@ -282,7 +281,7 @@ while accuracy < 0.99 and epoch < max_epochs:
     gradients4 = nn.backpropagation_with_reverse_AD(X_train, y_train)
     end = time.time() - start
     gradients4_total += end
-    # print("gradients4", gradients4[0][0], gradients4[0][1], gradients4[1])
+#     print("gradients4", gradients4[0][0], gradients4[0][1], gradients4[1])
 
     nn.update_weights(gradients4, lr=0.01)
     epoch += 1
