@@ -219,22 +219,43 @@ class SimpleNN:
         self.b1 -= lr * db1
 
 
-np.random.seed(3)
+def generate_linearly_separable_data(n_samples_per_class, n_dimensions, separation=2.0, noise=1.0):
+    """
+    Generates linearly separable data in n-dimensional space.
+    :param n_samples_per_class:
+    :param n_dimensions:
+    :param separation:
+    :param noise:
+    :return:
+    """
+    # Generate a random hyperplane normal vector
+    hyperplane_normal = np.random.randn(n_dimensions)
+    hyperplane_normal /= np.linalg.norm(hyperplane_normal)
 
-# Generate random x values for two classes
-x_class1 = np.random.rand(100, 2) * [1, 1] + [0, 1]  # Points above the line
-x_class2 = np.random.rand(100, 2) * [1, 1] + [1, -1]  # Points below the line
+    # Generate points for class 1 (positive class)
+    X1 = np.random.randn(n_samples_per_class, n_dimensions) * noise
+    X1 += separation * hyperplane_normal  # Shift points above the hyperplane
 
-# Combine data and create labels
-X = np.vstack((x_class1, x_class2))
-y = np.hstack((np.ones(100), np.zeros(100)))  # 1 for class above line, 0 for below
+    # Generate points for class 2 (negative class)
+    X2 = np.random.randn(n_samples_per_class, n_dimensions) * noise
+    X2 -= separation * hyperplane_normal  # Shift points below the hyperplane
+
+    # Combine the data
+    X = np.vstack([X1, X2])
+    y = np.hstack([np.ones(n_samples_per_class), np.zeros(n_samples_per_class)])
+
+    return X, y
+
+# np.random.seed(3)
+
+dimensions = 5
+X, y = generate_linearly_separable_data(500, dimensions, separation=1, noise=0.5)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 y_train = y_train.reshape(-1, 1)
 y_test = y_test.reshape(-1, 1)
 
-nn = SimpleNN(2, 1)
-nn.backpropagation_gradients(X, y)
+nn = SimpleNN(dimensions, 1)
 
 gradients3_total = 0
 gradients4_total = 0
@@ -243,7 +264,9 @@ start_time = time.time()
 accuracy = 0
 epoch = 0
 max_epochs = 10000
-while accuracy < 0.99 and epoch < max_epochs:
+plot = (dimensions == 2)
+# while accuracy < 0.99 and epoch < max_epochs:
+while epoch < 10000:
     if epoch % 100 == 0:
         y_pred_test = nn.forward(X_test)
         print(f"Epoch {epoch}")
@@ -251,9 +274,11 @@ while accuracy < 0.99 and epoch < max_epochs:
         print(f"Test accuracy: {accuracy:.2f}")
         loss = SimpleNN.loss(y_test, y_pred_test)
         print(f"Test loss: {loss:.2f}")
-
-        plot_decision_boundary(X_test, y_test, nn)
-        time.sleep(0.5)
+        if plot:
+            plot_decision_boundary(X_test, y_test, nn)
+            time.sleep(0.5)
+        print(f"Forward AD taken {gradients3_total:.5f} seconds so far")
+        print(f"Reverse AD taken {gradients4_total:.5f} seconds so far")
         print()
 
     # gradients = nn.backpropagation_gradients(X_train, y_train)
@@ -280,7 +305,7 @@ while accuracy < 0.99 and epoch < max_epochs:
 
     # print("Epoch", epoch)
 
-if epoch == max_epochs:
+if epoch == max_epochs and accuracy < 0.99:
     print("Failed to converge")
 
 backprop_time = time.time() - start_time
@@ -290,4 +315,5 @@ print(f"Forward AD took {gradients3_total:.5f} seconds")
 print(f"Reverse AD took {gradients4_total:.5f} seconds")
 
 # Plot decision boundary
-plot_decision_boundary(X_test, y_test, nn)
+if plot:
+    plot_decision_boundary(X_test, y_test, nn)

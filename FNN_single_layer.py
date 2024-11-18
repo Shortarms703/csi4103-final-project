@@ -243,7 +243,6 @@ y_train = y_train.reshape(-1, 1)
 y_test = y_test.reshape(-1, 1)
 
 nn = SimpleNN(2, 1)
-nn.backpropagation_gradients(X, y)
 
 gradients3_total = 0
 gradients4_total = 0
