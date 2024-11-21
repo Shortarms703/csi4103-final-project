@@ -17,7 +17,7 @@ class Variable:
         else:
             raise ValueError(f"Variable {self.name} not found in values")
 
-`    def get_size(self):
+    def get_size(self):
         return 1
 
 
