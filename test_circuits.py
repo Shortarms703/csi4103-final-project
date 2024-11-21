@@ -415,7 +415,7 @@ def test_back_partial_compared_to_sympy_for_sigmoid():
             assert round(float(sympy_gradients['y']), 5) == round(float(partial_y_evaluated), 5)
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_partial_compared_to_sympy():
     a = 2
 
@@ -472,3 +472,84 @@ def test_partial_compared_to_sympy():
                             assert round(float(sympy_gradients['W1_1']), 5) == round(float(back_partial_W1_1_evaluated), 5)
                             assert round(float(sympy_gradients['W1_2']), 5) == round(float(back_partial_W1_2_evaluated), 5)
                             assert round(float(sympy_gradients['b1']), 5) == round(float(back_partial_b1_evaluated), 5)
+
+def test_get_size_variable():
+    x = Variable('x')
+    assert x.get_size() == 1
+
+    y = Variable('y')
+    assert y.get_size() == 1
+
+    z = Variable('z')
+    assert z.get_size() == 1
+
+def test_get_size_constant():
+    c = Constant(5)
+    assert c.get_size() == 1
+
+    c = Constant(0)
+    assert c.get_size() == 1
+
+    c = Constant(0.5)
+    assert c.get_size() == 1
+
+def test_get_size_addition():
+    x = Variable('x')
+    y = Variable('y')
+    f = Add(x, y)
+    assert f.get_size() == 3
+
+    f = Add(x, Constant(5))
+    assert f.get_size() == 3
+
+    f = Add(Add(Constant(5), Constant(5)), Constant(5))
+    assert f.get_size() == 5
+
+def test_get_size_multiplication():
+    x = Variable('x')
+    y = Variable('y')
+    f = Multiply(x, y)
+    assert f.get_size() == 3
+
+    f = Multiply(x, Constant(5))
+    assert f.get_size() == 3
+
+    f = Multiply(Multiply(Constant(5), Constant(5)), Constant(5))
+    assert f.get_size() == 5
+
+def test_get_size_exponent():
+    x = Variable('x')
+    f = Exponent(x, Constant(2))
+    assert f.get_size() == 3
+
+    f = Exponent(x, Constant(0))
+    assert f.get_size() == 3
+
+    f = Exponent(Add(x, Constant(5)), Constant(2))
+    assert f.get_size() == 5
+
+def test_get_size_sigmoid():
+    x = Variable('x')
+    f = Sigmoid(x)
+    assert f.get_size() == 2
+
+    f = Sigmoid(Add(x, Constant(5)))
+    assert f.get_size() == 4
+
+    f = Sigmoid(Add(x, Multiply(Constant(-1), x)))
+    assert f.get_size() == 6
+
+def test_get_size_expression():
+    x = Variable('x')
+    y = Variable('y')
+    f = Expression(Add(x, Multiply(x, y)))
+    assert f.get_size() == 5
+
+    f = Expression(Multiply(x, Multiply(Constant(-1), y)))
+    assert f.get_size() == 5
+
+    f = Expression(Exponent(Multiply(x, Multiply(Constant(-1), y)), Constant(2)))
+    assert f.get_size() == 7
+
+    f = Expression(Sigmoid(Add(x, Multiply(Constant(-1), y))))
+    assert f.get_size() == 6

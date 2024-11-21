@@ -17,6 +17,9 @@ class Variable:
         else:
             raise ValueError(f"Variable {self.name} not found in values")
 
+`    def get_size(self):
+        return 1
+
 
 class Constant:
     def __init__(self, value):
@@ -33,6 +36,9 @@ class Constant:
     def evaluate(self, values: dict):
         return self.value
 
+    def get_size(self):
+        return 1
+
 
 class Operation:
     def __eq__(self, other):
@@ -42,6 +48,9 @@ class Operation:
         return NotImplemented
 
     def evaluate(self, values: dict):
+        return NotImplemented
+
+    def get_size(self):
         return NotImplemented
 
 
@@ -60,6 +69,9 @@ class Add(Operation):
 
     def evaluate(self, values: dict):
         return self.left.evaluate(values) + self.right.evaluate(values)
+
+    def get_size(self):
+        return 1 + self.left.get_size() + self.right.get_size()
 
 
 class Multiply(Operation):
@@ -83,6 +95,9 @@ class Multiply(Operation):
     def evaluate(self, values: dict):
         return self.left.evaluate(values) * self.right.evaluate(values)
 
+    def get_size(self):
+        return 1 + self.left.get_size() + self.right.get_size()
+
 
 class Exponent(Operation):
     def __init__(self, base, exponent):
@@ -101,6 +116,9 @@ class Exponent(Operation):
     def evaluate(self, values: dict):
         return self.base.evaluate(values) ** self.exponent.evaluate(values)
 
+    def get_size(self):
+        return 1 + 1 + self.base.get_size()
+
 
 class Sigmoid(Operation):
     def __init__(self, x):
@@ -117,6 +135,9 @@ class Sigmoid(Operation):
     def evaluate(self, values: dict):
         return 1 / (1 + np.exp(-self.x.evaluate(values)))
 
+    def get_size(self):
+        return 1 + self.x.get_size()
+
 
 class Expression:
     def __init__(self, value):
@@ -130,6 +151,9 @@ class Expression:
 
     def evaluate(self, values: dict):
         return self.value.evaluate(values)
+
+    def get_size(self):
+        return self.value.get_size()
 
 
 def forward_propagation_partial(func: Expression | Variable, var: Variable) -> Expression:
