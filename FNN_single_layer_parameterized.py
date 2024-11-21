@@ -32,8 +32,8 @@ class SimpleNN:
         self.W1 = np.random.randn(input_size, output_size)
         self.b1 = np.zeros((1, output_size))
 
-        self.z1 = None
-        self.a1 = None
+        self.z1 = None  # before activation function
+        self.a1 = None  # after activation function
 
         self.timer = 0
 
@@ -136,7 +136,6 @@ class SimpleNN:
 
         return dW1, db1
 
-
     def get_inputs_weights_biases(self):
         inputs = [Variable(f'X_{i}') for i in range(1, self.input_size + 1)]
         outputs = [Variable(f'y_{i}') for i in range(1, self.output_size + 1)]
@@ -216,7 +215,6 @@ class SimpleNN:
 
         return self.create_backpropagation_values(X, y, inputs, outputs, weights_1, biases_1, partials)
 
-
     def update_weights(self, gradients, lr=0.01):
         """
         Update weights using gradients
@@ -255,6 +253,7 @@ def generate_linearly_separable_data(n_samples_per_class, n_dimensions, separati
     y = np.hstack([np.ones(n_samples_per_class), np.zeros(n_samples_per_class)])
 
     return X, y
+
 
 if __name__ == '__main__':
     # np.random.seed(3)
@@ -313,7 +312,6 @@ if __name__ == '__main__':
 
         nn.update_weights(gradients4, lr=0.01)
         epoch += 1
-
 
         # print("Epoch", epoch)
 
