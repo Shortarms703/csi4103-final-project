@@ -10,8 +10,10 @@ def test_accuracy(y_test, y_pred_test):
     accuracy = np.mean(y_pred_class == y_test)
     return accuracy
 
+count = 0
+def plot_decision_boundary(X, y, model, title='Decision Boundary'):
+    global count
 
-def plot_decision_boundary(X, y, model):
     x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
     y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
     xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.01),
@@ -23,3 +25,5 @@ def plot_decision_boundary(X, y, model):
     plt.scatter(X[:, 0], X[:, 1], c=y, edgecolors='k', marker='o')
     plt.title("Decision Boundary")
     plt.show()
+    # plt.savefig(f"graphs/intial_2d_training_no_activation_function_gif/decision_boundary_{count}.png")
+    count += 1

@@ -97,8 +97,6 @@ def visualize_training_data(X_train, y_train):
 
 
 
-
-
 np.random.seed(3)
 
 # Example usage

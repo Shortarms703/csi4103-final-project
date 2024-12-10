@@ -158,10 +158,15 @@ class SimpleNN:
         inputs = [Variable(f'X_{i}') for i in range(1, self.input_size + 1)]
         outputs = [Variable(f'y_{i}') for i in range(1, self.output_size + 1)]
 
-        weights_1 = [Variable(f'W_{i}_{j}') for i, j in
-                     itertools.product(range(1, self.input_size + 1), range(1, self.output_size + 1))]
-        biases_1 = [Variable(f'b_{i}') for i in range(1, self.output_size + 1)]
-        return inputs, outputs, weights_1, biases_1
+        all_layers = [self.input_size, *self.hidden_layers, self.output_size]
+        weights = []
+        biases = []
+        for i in range(len(all_layers) - 1):
+            weights.append([Variable(f'W_{i}_{j}') for j in range(all_layers[i])])
+            biases.append([Variable(f'b_{i}_{j}') for j in range(all_layers[i])])
+
+        return inputs, outputs, list(itertools.chain(*weights)), list(itertools.chain(*biases))
+
 
     def get_output_equation(self):
         # all assumes 1 output node

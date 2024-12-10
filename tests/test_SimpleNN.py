@@ -193,5 +193,18 @@ def test_forward_single_hidden_layer():
 
     assert np.allclose(y_pred, np.array([[sigmoid(pre_sigmoid_output_of_node_3_for_x1)], [sigmoid(pre_sigmoid_output_of_node_3_for_x2)]]))
 
+def test_get_inputs_weights_biases():
+    nn = SimpleNN(2, [2], 1)
 
+    nn.W_list[0] = np.array([[1, 2], [3, 4]])
+    nn.b_list[0] = np.array([[5, 6]])
 
+    nn.W_list[1] = np.array([[7], [8]])
+    nn.b_list[1] = np.array([[9]])
+
+    inputs, outputs, weights, biases = nn.get_inputs_weights_biases()
+
+    print(inputs)
+    print(outputs)
+    print(weights)
+    print(biases)

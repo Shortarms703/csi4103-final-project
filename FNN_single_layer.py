@@ -252,7 +252,7 @@ accuracy = 0
 epoch = 0
 max_epochs = 10000
 while accuracy < 0.99 and epoch < max_epochs:
-    if epoch % 100 == 0:
+    if epoch % 20 == 0:
         y_pred_test = nn.forward(X_test)
         print(f"Epoch {epoch}")
         accuracy = test_accuracy(y_test, y_pred_test)
@@ -261,7 +261,9 @@ while accuracy < 0.99 and epoch < max_epochs:
         print(f"Test loss: {loss:.2f}")
 
         plot_decision_boundary(X_test, y_test, nn)
-        time.sleep(0.5)
+        if epoch == 0:
+            plot_decision_boundary(X_test, y_test, nn)
+        # time.sleep(0.5)
         print()
 
     # gradients = nn.backpropagation_gradients(X_train, y_train)

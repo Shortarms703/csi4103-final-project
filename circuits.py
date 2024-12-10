@@ -219,30 +219,36 @@ class ReverseModeSymbolicEvaluator:
 
     def derive(self, expr: Expression, seed: Expression):
         self.clear()
+        self.reverse_count = 0
         self._derive(expr.value, seed)
 
     def _derive(self, z, seed: Expression):
         if isinstance(z, Constant):
             pass
         elif isinstance(z, Variable):
+            self.reverse_count += 1
             self.add_derivative(z, seed)
         elif isinstance(z, Add):
+            self.reverse_count += 3
             # Sum rule: d(f + g)/dx = df/dx + dg/dx
             self._derive(z.left, seed)
             self._derive(z.right, seed)
         elif isinstance(z, Multiply):
+            self.reverse_count += 3
             # Product rule: d(f * g)/dx = f * dg/dx + g * df/dx
             self._derive(z.left, Expression(Multiply(seed.value, z.right)))
             self._derive(z.right, Expression(Multiply(seed.value, z.left)))
         elif isinstance(z, Exponent):
+            self.reverse_count += 4
             # Power rule with constant exponent: d(f^c)/dx = c * f^(c-1) * df/dx
             if not isinstance(z.exponent, Constant):
                 raise ValueError("Exponent must be a constant for symbolic reverse mode")
             c = z.exponent
-            f = Expression(z.base)
-            f_c_minus_1 = Expression(Exponent(z.base, Constant(c.value - 1)))
-            self._derive(z.base, Expression(Multiply(seed.value, Multiply(c, f_c_minus_1.value))))
+            f = z.base
+            f_c_minus_1 = Expression(Exponent(f, Constant(c.value - 1)))
+            self._derive(f, Expression(Multiply(seed.value, Multiply(c, f_c_minus_1.value))))
         elif isinstance(z, Sigmoid):
+            self.reverse_count += 4
             # Chain rule: d(sigmoid(f))/dx = sigmoid(f) * (1 - sigmoid(f)) * df/dx
             sigmoid_expr = Expression(Sigmoid(z.x))
             one_minus_sigmoid = Expression(Add(Constant(1), Multiply(Constant(-1), sigmoid_expr.value)))
@@ -250,9 +256,207 @@ class ReverseModeSymbolicEvaluator:
         else:
             raise ValueError(f"Unsupported operation: {z}")
 
+    def get_reverse_ad_circuit(self, z: Expression):
+        """
+        Generate the computational circuit for reverse mode automatic differentiation
+        and compute partial derivatives
+
+        Args:
+            z (Expression): The expression to differentiate
+
+        Returns:
+            dict: Partial derivatives for each variable
+        """
+        # Reset the circuit and derivatives
+        self.circuit = {}
+        self.derivatives = {}
+
+        # Topological order storage
+        tape = []
+
+        # Perform a topological traversal and circuit generation
+        def process_node(node, current_tape_index):
+            """
+            Recursively process nodes and build the computational circuit
+
+            Args:
+                node: Current node being processed
+                current_tape_index: Current index in the computational tape
+
+            Returns:
+                int: Next available tape index
+            """
+            # If the node is already processed, return its existing index
+            if id(node) in self.circuit:
+                return current_tape_index
+
+            # Process based on node type
+            if isinstance(node, Constant):
+                # Constants are added to the circuit with their value
+                self.circuit[id(node)] = {
+                    'type': 'constant',
+                    'value': node.value,
+                    'tape_index': current_tape_index
+                }
+                tape.append(node)
+                return current_tape_index + 1
+
+            elif isinstance(node, Variable):
+                # Variables are added to the circuit with their name
+                self.circuit[id(node)] = {
+                    'type': 'variable',
+                    'name': node.name,
+                    'tape_index': current_tape_index
+                }
+                tape.append(node)
+                return current_tape_index + 1
+
+            elif isinstance(node, Add):
+                # Process left and right children first
+                left_index = process_node(node.left, current_tape_index)
+                right_index = process_node(node.right, left_index)
+
+                # Add the addition operation to the circuit
+                self.circuit[id(node)] = {
+                    'type': 'add',
+                    'left': id(node.left),
+                    'right': id(node.right),
+                    'tape_index': right_index
+                }
+                tape.append(node)
+                return right_index + 1
+
+            elif isinstance(node, Multiply):
+                # Process left and right children first
+                left_index = process_node(node.left, current_tape_index)
+                right_index = process_node(node.right, left_index)
+
+                # Add the multiplication operation to the circuit
+                self.circuit[id(node)] = {
+                    'type': 'multiply',
+                    'left': id(node.left),
+                    'right': id(node.right),
+                    'tape_index': right_index
+                }
+                tape.append(node)
+                return right_index + 1
+
+            elif isinstance(node, Exponent):
+                # Process base first
+                base_index = process_node(node.base, current_tape_index)
+
+                # Add the exponentiation operation to the circuit
+                self.circuit[id(node)] = {
+                    'type': 'exponent',
+                    'base': id(node.base),
+                    'exponent': node.exponent.value,
+                    'tape_index': base_index
+                }
+                tape.append(node)
+                return base_index + 1
+
+            elif isinstance(node, Sigmoid):
+                # Process input first
+                x_index = process_node(node.x, current_tape_index)
+
+                # Add the sigmoid operation to the circuit
+                self.circuit[id(node)] = {
+                    'type': 'sigmoid',
+                    'input': id(node.x),
+                    'tape_index': x_index
+                }
+                tape.append(node)
+                return x_index + 1
+
+            else:
+                raise ValueError(f"Unsupported operation: {type(node)}")
+
+        # Build the circuit and tape
+        process_node(z.value, 0)
+
+        # Backward pass to compute derivatives
+        derivatives = {}
+        adjoint = {id(z.value): Expression(Constant(1))}
+
+        # Traverse tape in reverse order
+        for node in reversed(tape):
+            node_id = id(node)
+
+            if node_id not in adjoint:
+                continue
+
+            # Derivative computation based on node type
+            if isinstance(node, Add):
+                # Sum rule: d(f + g)/dx = df/dx + dg/dx
+                left_id = id(node.left)
+                right_id = id(node.right)
+
+                # Update left child's adjoint
+                if left_id in adjoint:
+                    adjoint[left_id] = Expression(
+                        Add(adjoint[left_id].value, adjoint[node_id].value)
+                    )
+                else:
+                    adjoint[left_id] = adjoint[node_id]
+
+                # Update right child's adjoint
+                if right_id in adjoint:
+                    adjoint[right_id] = Expression(
+                        Add(adjoint[right_id].value, adjoint[node_id].value)
+                    )
+                else:
+                    adjoint[right_id] = adjoint[node_id]
+
+            elif isinstance(node, Multiply):
+                # Product rule: d(f * g)/dx = f * dg/dx + g * df/dx
+                left_id = id(node.left)
+                right_id = id(node.right)
+
+                # Update left child's adjoint
+                left_grad = Expression(Multiply(adjoint[node_id].value, node.right))
+                if left_id in adjoint:
+                    adjoint[left_id] = Expression(
+                        Add(adjoint[left_id].value, left_grad.value)
+                    )
+                else:
+                    adjoint[left_id] = left_grad
+
+                # Update right child's adjoint
+                right_grad = Expression(Multiply(adjoint[node_id].value, node.left))
+                if right_id in adjoint:
+                    adjoint[right_id] = Expression(
+                        Add(adjoint[right_id].value, right_grad.value)
+                    )
+                else:
+                    adjoint[right_id] = right_grad
+
+            elif isinstance(node, Variable):
+                # Accumulate derivatives for variables
+                if node.name not in derivatives:
+                    derivatives[node.name] = adjoint[node_id]
+                else:
+                    derivatives[node.name] = Expression(
+                        Add(derivatives[node.name].value, adjoint[node_id].value)
+                    )
+
+        self.derivatives = derivatives
+        return derivatives
 
 def back_propagation_partial(func: Expression | Variable) -> ReverseModeSymbolicEvaluator:
     evaluator = ReverseModeSymbolicEvaluator()
     evaluator.derive(func, Expression(Constant(1)))
 
     return evaluator
+
+
+if __name__ == '__main__':
+    evaluator = ReverseModeSymbolicEvaluator()
+    x = Variable("x")
+    y = Variable("y")
+    z = Expression(Multiply(Add(x, y), y))
+    evaluator.derive(z, Expression(Constant(1)))
+    print("Partial Derivatives:")
+    for var, deriv in evaluator.derivatives.items():
+        print(f"d/d{var}: {deriv}")
+    print(evaluator.reverse_count)
+
