@@ -1,6 +1,8 @@
 # CSI 4103 Final Project
 
-Comparing the performance of model training with forward vs back propagation in calculating the gradients.
+This repository contains the code for the CSI 4103 project by Joshua Rostenne, Tess Harper, and Jacob Maurice. 
+
+Our project compares the performance of model training with forward vs back propagation in calculating the gradients.
 
 The [training_time_graphs.ipynb](training_time_graphs.ipynb) is the file run to produce the graphs in the report. 
 
